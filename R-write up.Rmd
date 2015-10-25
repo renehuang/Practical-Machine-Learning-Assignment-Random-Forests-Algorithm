@@ -1,0 +1,167 @@
+---
+title: "Practical Machine Learning Assignment-Using Random Forests Algorithm"
+author: "Mengyu Huang"
+date: "October 24, 2015"
+output: html_document
+---
+///
+Background
+///
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+Our data are from a human activity recognition research which has traditionally focused on discriminating between different activities, i.e. to predict "which" activity was performed at a specific point in time (like with the Daily Living Activities dataset above). The approach we propose for the Weight Lifting Exercises dataset is to investigate "how (well)" an activity was performed by the wearer. The "how (well)" investigation has only received little attention so far, even though it potentially provides useful information for a large variety of applications,such as sports training.
+
+In this work (see the paper) we first define quality of execution and investigate three aspects that pertain to qualitative activity recognition: the problem of specifying correct execution, the automatic and robust detection of execution mistakes, and how to provide feedback on the quality of execution to the user. We tried out an on-body sensing approach (dataset here), but also an "ambient sensing approach" (by using Microsoft Kinect - dataset still unavailable) 
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were supposed to simulate. The exercises were performed by six male participants aged between 20-28 years, with little weight lifting experience. We made sure that all participants could easily simulate the mistakes in a safe and controlled manner by using a relatively light dumbbell (1.25kg).
+
+In order to predict the quality of exercise, we use the random forests algorithm introduced during the lecture to finish this project. 
+
+
+///
+Random Forests Model
+///
+The main idea of Random forests mdoel is to build a large number of trees, where each tree is built on a bootstrap sample.
+
+Note:Using random forests method should be careful to avoid overfitting. (check the cross vaildation.)
+
+///
+Load data
+///
+
+```{r}
+#set working path
+setwd("C:/personal development/machine learning")
+
+#read into the data, interpreting NA, #DIV/0! and empty fields as NA:
+training<-data.frame(read.csv("pml-training.csv", header=T, na.strings=c("NA", "#DIV/0!","")))
+testing<-data.frame(read.csv("pml-testing.csv", header=T, na.string=c("NA", "#DIV/0!","")))
+
+#have a quick look at the dataset
+table(training$classe)
+prop.table(table(training$user_name,training$classe),1)
+prop.table(table(training$classe))
+```
+
+///
+clean & split data
+```{r}
+#remove categorical variables, and all columns that are mostly NA
+training<-training[,7:160]
+testing<-testing[,7:160]
+
+is_data<-apply(!is.na(training),2,sum)>19621
+training<-training[,is_data]
+testing<-testing[,is_data]
+
+#split the training set into two for cross validation purposes
+library(caret)
+set.seed(75)
+
+inTrain<-createDataPartition(y=training$classe,p=0.60)[[1]]
+train1<-training[inTrain,]
+train2<-training[-inTrain,]
+dim(train1)
+dim(train2)
+
+nzv_cols<-nearZeroVar(training)
+if(length(nzv_cols)>0){
+  train1<-train1[,-nzv_cols]
+  train2<-train2[,-nzv_cols]
+}
+dim(train1)
+dim(train2)
+```
+
+Now we can see we have 53 clean covariates to build a model for classe(which is th e54th column of the data set). However, 53 covariates are still to many, so we would like to choose the relative important ones to do the prediction.
+
+We directly use randomForest() here in order to plot data importance using varlmpPlot()
+
+///
+Picking up the most important variables
+///
+
+```{r}
+library(randomForest)
+modFit<-randomForest(classe~.,data=train1,importance=TRUE,ntree=100)
+varImpPlot(modFit)
+
+#plot important variables
+varImpPlot(modFit)
+
+```
+
+We would like to choose 13 parameters out of the 53.
+
+According to the graph, we select top 13 variables.
+
+Our 13 variables are: yaw_belt, roll_belt, num_window, pitch_ belt,magnet_dumbbell_y, magnet_dumbbell_z, pitch_forearm, accel_dumbbell_y, roll_arm, roll_forearm, magnet_belt_z,accel_belt_z,roll_dumbbell
+
+We need to analyse the correlations. Replace the 1s in the diagonals with 0s in the correlation matrix, and output which variables have an absolute value correlation above 80%
+
+```{r}
+correl = cor(train1[,c("yaw_belt","roll_belt","num_window","pitch_belt","magnet_dumbbell_z","magnet_dumbbell_y","pitch_forearm","accel_dumbbell_y","roll_arm","roll_forearm","magnet_belt_z","accel_belt_z","roll_dumbbell")])
+diag(correl) <- 0
+which(abs(correl)>0.8, arr.ind=TRUE)
+```
+
+We can see that "roll_belt" and "yaw_belt"; "accel_belt_z" and "roll_belt" have a high correlation. We eliminate "yaw_belt" and calculate once again.
+
+```{r}
+correl = cor(train1[,c("yaw_belt","num_window","pitch_belt","magnet_dumbbell_z","magnet_dumbbell_y","pitch_forearm","accel_dumbbell_y","roll_arm","roll_forearm","magnet_belt_z","accel_belt_z","roll_dumbbell")])
+diag(correl) <- 0
+which(abs(correl)>0.8, arr.ind=TRUE)
+```
+
+The reason why we don't eliminate "roll_belt" can be listed as below.
+
+```{r}
+library(rpart.plot)
+modelFit<-rpart(classe~.,data=train1,method='class')
+prp(modelFit)
+```
+
+This quick tree classifier selects roll_belt as the first discriminant among all the variables, which shows "roll_belt" is a much more important covariate.
+
+///
+Prediction Model
+///
+I am going to use the random forests method that introduced during the lecture.
+
+```{r}
+set.seed(96)
+modelFit<-train(classe~roll_belt+num_window+pitch_belt+magnet_dumbbell_y+magnet_dumbbell_z+pitch_forearm+accel_dumbbell_y,
+                data=train1,
+                method='rf',
+                trControl=trainControl(method='cv',number=2),
+                prox=TRUE,
+                verbose=TRUE,
+                allowParallel=TRUE)
+```
+
+How accurate?
+Apply on the train2 test set.
+
+```{r}
+predictions <- predict(modelFit, newdata=train2)
+confusionMat <- confusionMatrix(predictions, train2$classe)
+confusionMat
+
+#Coursera submission
+predictions <- predict(modelFit, newdata=testing)
+testing$classe <- predictions
+submit <- data.frame(problem_id = testing$problem_id, classe = predictions)
+write.csv(submit, file = "coursera-submission.csv", row.names = FALSE)
+
+answers = testing$classe
+write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_",i,".txt")
+    write.table(x[i], file=filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+  }
+}
+write_files(answers)

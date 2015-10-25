@@ -1,0 +1,33 @@
+---
+title: "Cross-validation"
+author: "Mengyu Huang"
+date: "October 24, 2015"
+output: html_document
+---
+
+Approach:
+1.use the training set;
+2.split it into training/test sets;
+3.build a model on the training set;
+4.evaluate on the test set;
+5.repeat and average the estimated errors.
+
+Used for:
+1.picking variables to include in a model;
+2.picking the type of prediction function to use;
+3.picking the parameter in the prediction function;
+4.comparing different predictors.
+
+Different ways to do that:
+random subsampling;
+k-fold;
+leave one out;
+
+Considerations:
+1.for time series data,data must be used in "chunks";
+2.for k-fold cross validation:
+Larger k=less bias,more variance;
+Smaller k=more bias, less variance.
+3.random sampling must be done without replacement;
+4.random sampling with replacement is the bootstrap.(underestimates of the error;can be corrected, but it is complicated);
+5.if you cross-validate to pick predictors estimate you must estimate errors.

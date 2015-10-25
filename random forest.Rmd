@@ -1,0 +1,63 @@
+---
+title: "Random forests"
+author: "Mengyu Huang"
+date: "October 24, 2015"
+output: html_document
+---
+Random Forests:
+1. Bootstrap samples;
+2. At each split, bootstrap variables;
+3. Grow multiple trees and vote;
+
+Pros:
+1. Accuracy;
+
+Cons:
+1. Speed;
+2. Interpretability;
+3. Overfitting
+
+The idea is you build a large number of trees;
+Where each tree is build on a bootstrap sample;
+
+
+```{r}
+
+data(iris)
+library(ggplot2)
+library(caret)
+
+#Partite the dataset into training set and test set
+inTrain<-createDataPartition(y=iris$Species,
+                             p=0.7,list=FALSE)
+training<-iris[inTrain,]
+testing<-iris[-inTrain,]
+
+#using random forests method to do the model fit
+#we can see the default set of random forests set is to use Resampling Bootstrapped 25 reps
+library(caret)
+modelFit<-train(Species~.,data=training,method='rf',prox=TRUE)
+modelFit
+
+#we can see a specific tree in our final model set using getTree function
+#set k=2 to get the second tree out
+getTree(modelFit$finalModel,k=2)
+
+#Looking at two particular variables, Petal.Length, Petal.Width,
+irisP<-classCenter(training[,c(3,4)],training$Species,modelFit$finalModel$prox)
+irisP<-as.data.frame(irisP);irisP$Species<-rownames(irisP)
+p<-qplot(Petal.Width,Petal.Length,col=Species,data=training)
+p+geom_point(aes(x=Petal.Width,y=Petal.Length,col=Species),size=5,shape=4,data=irisP)
+
+#predicting new values
+pred<-predict(modelFit,testing);testing$predRight<-pred==testing$Species
+table(pred,testing$Species)
+
+qplot(Petal.Width, Petal.Length, colour=predRight, data=testing,main='newdata Predictions')
+```
+
+Notes:
+1. Random forests are usually one of the two top performing prediction contests;
+2. Random forests are difficult to interpret but often very accurate;
+3. Care should be taken to avoid overfitting(see rfcv function to make the crossvaildation is performed)
+

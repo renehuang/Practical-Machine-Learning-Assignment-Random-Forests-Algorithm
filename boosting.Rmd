@@ -1,0 +1,19 @@
+---
+title: "Boosting"
+author: "Mengyu Huang"
+date: "October 24, 2015"
+output: html_document
+---
+Basic idea behind boost:
+1. Start with a set of classifiers h1,...,hk;
+examples: all possible trees, all possible regression models, all possible cutoffs.
+
+2. Create a classifier that combines classification functions:f(x)=sgn(sum(a*h(x))):
+1. goal is to minimize error(on training set);
+2. Iterative, select one h at each step;
+3. Calculate weights based on errors;
+4. Upweight missed classifications and select next h
+
+Boosting can be used with any subset of classifiers;
+One large subclass is gradient boosting;
+R has multiple boosting libraries. Differences include the choice of basic classification functions and combination rules.(gbm;mboost;ada;gamBoost)
